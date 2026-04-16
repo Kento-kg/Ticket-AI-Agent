@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Environment and secrets
+.env
+.env.*
+*.env
+.venv
+.venv/
+
+# Models and checkpoints
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+models/
+outputs/
+
+# Hugging Face cache
+.cache/
+huggingface/
+hf_cache/
+
+# Weights and Biases
+wandb/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Data
+data/raw/
+data/processed/
+
+# Logs
+*.log
+logs/
+
+# FastAPI / server
+*.pid
+
+# Testing and coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tar
