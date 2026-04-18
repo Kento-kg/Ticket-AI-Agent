@@ -12,6 +12,10 @@ build/
 # Jupyter Notebooks
 .ipynb_checkpoints
 
+#Data
+.csv
+*.csv
+
 # Environment and secrets
 .env
 .env.*
