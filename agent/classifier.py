@@ -10,7 +10,6 @@ class ClassificationResult(TypedDict):
     confidence: float
     team: str
 
-
 @lru_cache(maxsize=1)
 def load_pipeline() -> Pipeline:
     """Clasificador fine-tuned con pipeline gestionando tokenizacion, device, softmax,batching..."""
