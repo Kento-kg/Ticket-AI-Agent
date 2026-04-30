@@ -1,4 +1,4 @@
-CATEGORY_TO_TEAM: dict[str, str] = {
+CATEGORY_TO_TEAM = {
     "technical": "tech-support",
     "account":   "account-team",
     "biling":    "biling-team",
