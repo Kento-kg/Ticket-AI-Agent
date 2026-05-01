@@ -3,6 +3,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+
 @dataclass
 class AgentConfig:
     hf_model_id: str = "kentokamg/ticket-triage-finetuned"
@@ -21,5 +22,6 @@ class AgentConfig:
     dataset_path: Path = field(
         default_factory=lambda: PROJECT_ROOT / "data" / "processed" / "dataset.json"
     )
+
 
 cfg = AgentConfig()
