@@ -35,7 +35,7 @@ checkpoints/
 models/
 outputs/
 /Users/kento/Desktop/Projects/nlp/ticket_agent/agents
-agents/
+agent/
 
 # Hugging Face cache
 .cache/
