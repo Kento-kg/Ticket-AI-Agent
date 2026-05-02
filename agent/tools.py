@@ -2,7 +2,7 @@ import logging
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.tools import tool
+from langchain.tools import tool
 
 from agent.classifier import classify
 from agent.config import cfg
@@ -11,15 +11,11 @@ from agent.schemas import EscalationSummary, UrgencyAssessment
 
 logger = logging.getLogger(__name__)
 
-
 @tool
 def classify_ticket(text: str) -> dict:
     """Classify the ticket into one of: biling, technical, shipping, account, general.
-
-    Returns a dict with category, model confidence, and the team responsible
-    (derived deterministically from the category — 1-to-1 mapping)."""
+    Returns a dict with category, model confidence and the responsible team."""
     return classify(text)
-
 
 @tool
 def assess_urgency(text: str) -> dict:
@@ -35,8 +31,7 @@ def assess_urgency(text: str) -> dict:
         [
             SystemMessage(
                 content=(
-                    "You assess IT support ticket urgency. Output 'low', 'medium', "
-                    "or 'high' based on impact and urgency cues in the ticket."
+                    "You assess IT support ticket urgency. Output 'low', 'medium' or 'high' based on impact and urgency cues in the ticket."
                 )
             ),
             HumanMessage(content=text),

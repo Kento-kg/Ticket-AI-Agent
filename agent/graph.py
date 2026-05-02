@@ -8,10 +8,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
-from agents.config import cfg
-from agents.prompts import EXTRACT_OUTPUT_PROMPT, SYSTEM_PROMPT
-from agents.schemas import TicketTriageResult
-from agents.tools import TOOLS
+from agent.config import cfg
+from agent.prompts import EXTRACT_OUTPUT_PROMPT, SYSTEM_PROMPT
+from agent.schemas import TicketTriageResult
+from agent.tools import TOOLS
 
 logger = logging.getLogger(__name__)
 
