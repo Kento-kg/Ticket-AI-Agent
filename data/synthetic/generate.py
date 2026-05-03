@@ -10,7 +10,7 @@ load_dotenv()
 client = Anthropic()
 
 CATEGORIES = ['biling', 'technical', 'shipping', 'account', 'general']
-URGENCY = ['low', 'medium', 'hgih', 'critical']
+URGENCY = ['low', 'medium', 'high', 'critical']
 TEAMS = ['biling-team', 'tech-support', 'logistics', 'account-team', 'general-support']
 
 DEPARTMENT_TO_CATEGORY = {

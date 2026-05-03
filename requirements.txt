@@ -1,0 +1,39 @@
+# ML / NLP
+torch
+transformers
+datasets
+evaluate
+peft
+setfit
+sentence-transformers
+accelerate
+
+# LangGraph / LangChain
+langchain-core
+langchain-anthropic
+langchain-huggingface
+langchain-chroma
+langgraph
+langsmith
+
+# Vector store
+chromadb
+
+# LLM API
+anthropic
+
+# API
+fastapi
+uvicorn[standard]
+
+# Data
+pandas
+
+# HuggingFace Hub
+huggingface_hub
+
+# Tracking
+wandb
+
+# Utils
+python-dotenv
