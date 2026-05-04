@@ -10,7 +10,7 @@ load_dotenv()
 client = Anthropic()
 
 CATEGORIES = ['biling', 'technical', 'shipping', 'account', 'general']
-URGENCY = ['low', 'medium', 'high', 'critical']
+URGENCY = ['low', 'medium', 'high']
 TEAMS = ['biling-team', 'tech-support', 'logistics', 'account-team', 'general-support']
 
 DEPARTMENT_TO_CATEGORY = {
@@ -71,7 +71,7 @@ def generate_synthetic_underrepresented(underrepresented: list[tuple], n_per_cas
         ('general', 'high'): 'Important issues requiring immediate attention',
         ('biling', 'medium'): 'Billing discrepancies, unclear charges, invoice questions',
         ("shipping", "high"): "Package lost, significant delays, major tracking issues",
-        ("billing", "high"): "Duplicate charges, unexpected fees, refund requests",
+        ("biling", "high"): "Duplicate charges, unexpected fees, refund requests",
         ("shipping", "low"): "Shipping questions, method preferences",
         ("general", "low"): "General inquiries, feedback, suggestions",
     }
@@ -102,7 +102,7 @@ def generate_synthetic_underrepresented(underrepresented: list[tuple], n_per_cas
             tickets_synthetic = json.loads(response.content[0].text)
         except:
             print(f"Error parsing JSON")
-            tickets_list = []
+            tickets_synthetic = []
         
         for text in tickets_synthetic:
             synthetic.append({
