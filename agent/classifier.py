@@ -20,8 +20,8 @@ class ClassificationResult(TypedDict):
 def _load() -> tuple[AutoTokenizer, AutoModelForSequenceClassification, torch.device, dict[int, str]]:
     """Load the fine-tuned classifier once. Cached for the process lifetime."""
     logger.info(f"Loading classifier from {cfg.hf_model_id}")
-    id2label = {0: 'account', 1: 'biling', 2: 'general', 3: 'shipping', 4: 'technical'}
-    label2id = {'account': 0, 'biling': 1, 'general': 2, 'shipping': 3, 'technical': 4}
+    id2label = {0: 'account', 1: 'biling', 2: 'general', 3: 'technical'}
+    label2id = {'account': 0, 'biling': 1, 'general': 2, 'technical': 3}
     config = PeftConfig.from_pretrained(cfg.hf_model_id)
     tokenizer = AutoTokenizer.from_pretrained(cfg.hf_model_id)
     cat_model = AutoModelForSequenceClassification.from_pretrained(
@@ -37,8 +37,12 @@ def _load() -> tuple[AutoTokenizer, AutoModelForSequenceClassification, torch.de
     return tokenizer, cat_model, device, id2label
 
 def classify(text: str) -> ClassificationResult:
-    """Classify a ticket text. Returns category, confidence, and the team derived
-    from CATEGORY_TO_TEAM (1-to-1 mapping verified empirically in the dataset)."""
+    """Classify a ticket text. Returns category, confidence, and team.
+
+    OOD fallback: when softmax confidence is below `cfg.ood_threshold`, the
+    classifier is uncertain (likely an out-of-domain ticket), so we route it to
+    `general` / `general-support` instead of trusting a low-confidence guess.
+    """
     tokenizer, model, device, id2label = _load()
     inputs = tokenizer(
         text,
@@ -54,6 +58,9 @@ def classify(text: str) -> ClassificationResult:
     pred_id = int(torch.argmax(probs).item())
     confidence = float(probs[pred_id])
     category = id2label[pred_id]
+
+    if confidence < cfg.ood_threshold:
+        category = "general"
 
     return {
         "category": category,

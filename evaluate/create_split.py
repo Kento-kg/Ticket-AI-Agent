@@ -7,7 +7,7 @@ from datasets import ClassLabel, Dataset, DatasetDict, load_dataset
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATASET_PATH = PROJECT_ROOT / "data" / "processed" / "dataset_sep.json"
+DATASET_PATH = PROJECT_ROOT / "data" / "processed" / "dataset.json"
 TEST_PATH = PROJECT_ROOT / "data" / "processed" / "holdout.json"
 
 def load_dataset_from_hf() -> None:

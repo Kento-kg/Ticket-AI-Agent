@@ -1,29 +1,25 @@
 from anthropic import Anthropic
 from dotenv import load_dotenv
 import pandas as pd
-from datasets import load_dataset
 import os
 import time
 import json
+import re
 
 load_dotenv()
 client = Anthropic()
 
-CATEGORIES = ['biling', 'technical', 'shipping', 'account', 'general']
+CATEGORIES = ['biling', 'technical', 'account', 'general']
 URGENCY = ['low', 'medium', 'high']
-TEAMS = ['biling-team', 'tech-support', 'logistics', 'account-team', 'general-support']
+TEAMS = ['biling-team', 'tech-support', 'account-team', 'general-support']
 
 DEPARTMENT_TO_CATEGORY = {
     'Technical Support': 'technical',
     'Billing and Payments': 'biling',
     'Service Outages and Maintenance': 'account',
     'IT Support': 'technical',
-    'Human Resources': 'general',
-    'Returns and Exchanges': 'shipping',
-    'Sales and Pre-Sales': 'general',
     'Product Support': 'technical',
     'Customer Service': 'account',
-    'General Inquiry': 'general'
 }
 
 CATEGORY_TO_TEAM = {
@@ -31,16 +27,37 @@ CATEGORY_TO_TEAM = {
     'biling': 'biling-team',
     'account': 'account-team',
     'general': 'general-support',
-    'shipping': 'logistics'
 }
 
+
+def parse_json_array(raw: str) -> list[str]:
+    """Parsea un array JSON de strings tolerando markdown fences y texto extra."""
+    text = raw.strip()
+    fence = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, flags=re.DOTALL)
+    if fence:
+        text = fence.group(1)
+    else:
+        match = re.search(r"\[.*\]", text, flags=re.DOTALL)
+        if match:
+            text = match.group(0)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return []
+
+
 def process_real_tickets(df: pd.DataFrame) -> list[dict]:
+    """Procesa tickets del CSV. Filtra departamentos no mapeados (Returns and Exchanges,
+    Human Resources, Sales and Pre-Sales, General Inquiry) porque sus textos están
+    contaminados con contenido técnico mal etiquetado."""
     processed = []
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         department = str(row.get('Department', 'None'))
-        category = DEPARTMENT_TO_CATEGORY.get(department, 'general')
+        category = DEPARTMENT_TO_CATEGORY.get(department)
+        if category is None:
+            continue
         urgency = str(row.get('Priority', 'None'))
-        team = CATEGORY_TO_TEAM.get(category, 'general-support')
+        team = CATEGORY_TO_TEAM[category]
         ticket_text = str(row.get('Body', ''))
         if not ticket_text or len(ticket_text) < 5:
             continue
@@ -53,95 +70,148 @@ def process_real_tickets(df: pd.DataFrame) -> list[dict]:
     print(f'Processed {len(processed)} real tickets')
     return processed
 
-def find_underrepresented_cases(dataset: list[dict]) -> list[tuple]:
-    min_count = 1500
+
+def find_underrepresented_cases(dataset: list[dict], min_count: int = 1500) -> list[tuple]:
     counts = {}
     for ticket in dataset:
         key = (ticket['category'], ticket['urgency'])
-        counts[key] = counts.get(key, 0) +1
-    underrepresented = [key for key, count in counts.items() if count < min_count]
-    return underrepresented
+        counts[key] = counts.get(key, 0) + 1
+    targets = [
+        (cat, urg) for cat in CATEGORIES for urg in URGENCY
+        if counts.get((cat, urg), 0) < min_count
+    ]
+    return targets
 
-def generate_synthetic_underrepresented(underrepresented: list[tuple], n_per_case=100) -> list[dict]:
+
+IT_CASE_DESCRIPTIONS = {
+    ('biling', 'low'): 'General billing questions, invoice clarification needed',
+    ('biling', 'medium'): 'Billing discrepancies, unclear charges, invoice questions',
+    ('biling', 'high'): 'Duplicate charges, unexpected fees, refund requests',
+    ('account', 'low'): 'Profile updates, password reset, basic account questions',
+    ('account', 'medium'): 'Account access issues, locked accounts, role changes',
+    ('account', 'high'): 'Account compromised, unauthorized access, urgent security',
+    ('technical', 'low'): 'Minor product usage questions, small UI quirks',
+    ('technical', 'medium'): 'Recurring errors, integration issues, individual blockers',
+    ('technical', 'high'): 'Outages, data loss, production-critical bugs',
+}
+
+GENERAL_CASE_DESCRIPTIONS = {
+    'low': 'Casual product questions, feedback, suggestions, onboarding curiosity',
+    'medium': 'HR questions, sales/pricing inquiries, vague but non-blocking requests',
+    'high': 'Time-sensitive non-technical asks: contract questions, policy escalations',
+}
+
+
+def build_it_prompt(category: str, urgency: str, n: int) -> str:
+    description = IT_CASE_DESCRIPTIONS.get((category, urgency), f'{category} issue with {urgency} urgency')
+    return f"""Generate {n} realistic IT support tickets. Return ONLY a valid JSON array of strings, no other text, no markdown.
+Category: {category}
+Urgency: {urgency}
+Description: {description}
+
+Requirements:
+- Each ticket is a single customer message (1-3 sentences)
+- Vary the tone: frustrated, neutral, polite, urgent
+- Include realistic IT details: software names, error messages, hardware models
+- Some should have typos or grammar issues
+- Make them authentic - real support ticket language
+- Varied length and detail level
+
+Return ONLY a valid JSON array of strings:
+["ticket 1", "ticket 2", "ticket 3"]"""
+
+
+def build_general_prompt(urgency: str, n: int) -> str:
+    """Prompt aislado para 'general'. NO menciona IT support ni jerga técnica:
+    el modelo anterior contaminaba 'general' con tickets técnicos por seguir
+    instrucciones contradictorias."""
+    description = GENERAL_CASE_DESCRIPTIONS[urgency]
+    return f"""Generate {n} realistic customer support inquiries that do NOT fit a technical, billing, or account-management category.
+
+These are GENERAL inquiries: feedback, product questions, HR, sales/pre-sales, onboarding, contract clarifications, miscellaneous suggestions, or vague non-actionable requests.
+
+Urgency level: {urgency}
+Examples of intent: {description}
+
+Strict requirements:
+- Each message is a single customer message (1-3 sentences)
+- DO NOT include software names, error codes, hardware models, IP addresses, stack traces, or any technical jargon
+- DO NOT make them about bugs, outages, login problems, or billing disputes
+- Vary tone: polite, neutral, frustrated, curious
+- Some should have typos or grammar issues
+- They should sound like real human messages a non-technical customer would send
+
+Return ONLY a valid JSON array of strings, no markdown, no preamble:
+["inquiry 1", "inquiry 2", "inquiry 3"]"""
+
+
+def generate_synthetic(targets: list[tuple], n_per_case: int = 300, batch_size: int = 50) -> list[dict]:
+    """Genera tickets sintéticos. Llama varias veces con n=batch_size para evitar truncamiento.
+    Usa prompts distintos: uno general (sin jerga técnica) para 'general', otro IT para el resto."""
     synthetic = []
-    case_descriptions = {
-        ('shipping', 'medium'): 'Minor delays, tracking not updating',
-        ('biling', 'low'): 'General billing questions, invoice clarification needed',
-        ('general', 'medium'): 'General issues with some importance',
-        ('general', 'high'): 'Important issues requiring immediate attention',
-        ('biling', 'medium'): 'Billing discrepancies, unclear charges, invoice questions',
-        ("shipping", "high"): "Package lost, significant delays, major tracking issues",
-        ("biling", "high"): "Duplicate charges, unexpected fees, refund requests",
-        ("shipping", "low"): "Shipping questions, method preferences",
-        ("general", "low"): "General inquiries, feedback, suggestions",
-    }
-    for category, urgency in underrepresented:
-        description = case_descriptions.get((category, urgency), f'{category} issue with {urgency} urgency')
-        prompt = f"""Generate {n_per_case} realistic IT support tickets. Return ONLY a valid JSON array of strings, no other text, no markdown.
-        Category: {category}
-        Urgency: {urgency}
-        Description: {description}
-
-        Requirements:
-        - Each ticket is a single customer message (1-3 sentences)
-        - Vary the tone: frustrated, neutral, polite, urgent
-        - Include realistic IT details: software names, error messages, hardware models
-        - Some should have typos or grammar issues
-        - Make them authentic - real support ticket language
-        - Varied length and detail level
-
-        Remember, return ONLY a valid JSON array of strings, no other text, no markdown:
-        ["ticket 1", "ticket 2", "ticket 3"]       
-        """
-        response = client.messages.create(
-            model = 'claude-sonnet-4-6',
-            max_tokens = 2000,
-            messages = [{'role': 'user', 'content': prompt}]
-        )
-        try:
-            tickets_synthetic = json.loads(response.content[0].text)
-        except:
-            print(f"Error parsing JSON")
-            tickets_synthetic = []
-        
-        for text in tickets_synthetic:
-            synthetic.append({
-                "text": text,
-                "category": category,
-                "urgency": urgency,
-                "team": CATEGORY_TO_TEAM[category]
-            })
-        time.sleep(1)
+    for category, urgency in targets:
+        remaining = n_per_case
+        produced_for_pair = 0
+        while remaining > 0:
+            n_call = min(batch_size, remaining)
+            prompt = (
+                build_general_prompt(urgency, n_call)
+                if category == 'general'
+                else build_it_prompt(category, urgency, n_call)
+            )
+            response = client.messages.create(
+                model='claude-sonnet-4-6',
+                max_tokens=4000,
+                messages=[{'role': 'user', 'content': prompt}],
+            )
+            tickets = parse_json_array(response.content[0].text)
+            if not tickets:
+                print(f'  WARN: parsing failed for ({category}, {urgency}), skipping batch')
+                remaining -= n_call
+                continue
+            for text in tickets:
+                synthetic.append({
+                    'text': text,
+                    'category': category,
+                    'urgency': urgency,
+                    'team': CATEGORY_TO_TEAM[category],
+                })
+            produced_for_pair += len(tickets)
+            remaining -= n_call
+            time.sleep(1)
+        print(f'  ({category}, {urgency}): {produced_for_pair} sintéticos')
     print(f'Generated {len(synthetic)} synthetic tickets')
-    return synthetic        
+    return synthetic
 
-def save_dataset(dataset: list[dict], filepath: str='processed/dataset.json'):
+
+def save_dataset(dataset: list[dict], filepath: str = 'data/processed/dataset.json'):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
     with open(filepath, 'w') as f:
         json.dump(dataset, f, indent=2, ensure_ascii=False)
+    print(f'Dataset saved to {filepath}')
 
-    print(f'Dataset saved ti {filepath}')
 
 def main():
     print('Loading tickets...')
-    df = pd.read_csv('raw/IT_Support_Ticket Data.csv')
-    df = df.drop(columns=['Unnamed: 0'])
+    df = pd.read_csv('data/raw/IT_Support_Ticket Data.csv')
+    if 'Unnamed: 0' in df.columns:
+        df = df.drop(columns=['Unnamed: 0'])
+
     print('Processing real tickets')
     tickets_real = process_real_tickets(df)
-    print('Finding underrepresented cases')
-    underrepresented = find_underrepresented_cases(tickets_real)
-    print('Generating synthetic tickets for underrepresented edge cases')
-    tickets_synthetic = []
-    if underrepresented:
-        tickets_synthetic = generate_synthetic_underrepresented(
-            underrepresented,
-            n_per_case=1
-        )
+
+    print('Finding underrepresented cases (< 1500)')
+    targets = find_underrepresented_cases(tickets_real, min_count=1500)
+    for cat, urg in targets:
+        print(f'  underrepresented: ({cat}, {urg})')
+
+    print('Generating synthetic tickets')
+    tickets_synthetic = generate_synthetic(targets, n_per_case=300, batch_size=50)
+
     final_dataset = tickets_real + tickets_synthetic
-    print('Saving dataset')
+    print(f'Final dataset: {len(final_dataset)} tickets')
     save_dataset(final_dataset)
+
 
 if __name__ == '__main__':
     main()
-    

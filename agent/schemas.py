@@ -2,10 +2,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-CategoryLiteral = Literal["biling", "technical", "shipping", "account", "general"]
+CategoryLiteral = Literal["account", "biling", "general", "technical"]
 UrgencyLiteral = Literal["low", "medium", "high"]
 TeamLiteral = Literal[
-    "biling-team", "tech-support", "logistics", "account-team", "general-support"
+    "account-team", "biling-team", "general-support", "tech-support"
 ]
 
 

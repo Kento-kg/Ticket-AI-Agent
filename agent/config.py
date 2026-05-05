@@ -16,6 +16,8 @@ class AgentConfig:
     k_retrieval: int = 3
     collection_name: str = "ticket_history"
 
+    ood_threshold: float = 0.5
+
     chroma_dir: Path = field(
         default_factory=lambda: PROJECT_ROOT / "data" / "processed" / "chroma"
     )

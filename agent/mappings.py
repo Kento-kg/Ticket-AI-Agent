@@ -3,5 +3,4 @@ CATEGORY_TO_TEAM: dict[str, str] = {
     "account":   "account-team",
     "biling":    "biling-team",
     "general":   "general-support",
-    "shipping":  "logistics",
 }

@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 @tool
 def classify_ticket(text: str) -> dict:
-    """Classify the ticket into one of: biling, technical, shipping, account, general.
-    Returns a dict with category, model confidence and the responsible team."""
+    """Classify the ticket into one of: account, biling, general, technical.
+    Returns a dict with category, model confidence and the responsible team.
+    Low-confidence predictions (out-of-domain) are routed to 'general'."""
     return classify(text)
 
 @tool
